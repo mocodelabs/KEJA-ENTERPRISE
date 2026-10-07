@@ -5,6 +5,19 @@
   --foreground: #171717;
 }
 
+/*
+ * PropManager-inspired brand palette: a brighter teal-emerald than
+ * Tailwind's stock emerald, used everywhere the app already reaches for
+ * `emerald-*` utilities (buttons, links, badges, active nav states).
+ */
+@theme {
+  --color-emerald-50: #eafbf5;
+  --color-emerald-100: #d1f5e8;
+  --color-emerald-600: #0d9f88;
+  --color-emerald-700: #0b8172;
+  --color-emerald-800: #0f6657;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

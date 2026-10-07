@@ -1,0 +1,16 @@
+create index if not exists idx_credit_notes_invoice_id on credit_notes(invoice_id);
+create index if not exists idx_expenses_property_id on expenses(property_id);
+create index if not exists idx_messages_log_template_id on messages_log(template_id);
+create index if not exists idx_messages_log_tenant_id on messages_log(tenant_id);
+create index if not exists idx_meter_readings_unit_id on meter_readings(unit_id);
+create index if not exists idx_payroll_items_employee_id on payroll_items(employee_id);
+create index if not exists idx_payroll_items_payroll_run_id on payroll_items(payroll_run_id);
+create index if not exists idx_payroll_runs_approved_by on payroll_runs(approved_by);
+create index if not exists idx_penalty_rules_property_id on penalty_rules(property_id);
+create index if not exists idx_properties_client_id on properties(client_id);
+create index if not exists idx_quote_items_quote_id on quote_items(quote_id);
+create index if not exists idx_quotes_client_id on quotes(client_id);
+create index if not exists idx_quotes_property_id on quotes(property_id);
+create index if not exists idx_receipts_payment_id on receipts(payment_id);
+create index if not exists idx_reminder_rules_property_id on reminder_rules(property_id);
+create index if not exists idx_stationery_transactions_item_id on stationery_transactions(item_id);

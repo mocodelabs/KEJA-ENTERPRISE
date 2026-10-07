@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KEJA Enterprise
 
-## Getting Started
+Property management system for property managers and property owners — properties, tenants, billing, payments, messaging, accounting/reconciliation, reports, and internal ops (HR/payroll, equipment, stationery), built on Next.js + Supabase.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, TypeScript, Turbopack) + Tailwind CSS v4
+- **Supabase**: Postgres (with RLS), Auth, Edge Functions, pg_cron
+- Charts: Recharts · Icons: lucide-react · Toasts: sonner
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 (or the port shown). `.env.local` already points at the project's Supabase instance — copy `.env.local.example` if you need a fresh setup elsewhere.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Sign up, create an organization on the onboarding screen (choose "property manager" or "own my property directly"), and you're in.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
 
-## Learn More
+- `src/app/(dashboard)/**` — one route per module (properties, tenants, leases, billing, payments, messaging, quotes/credit notes, accounting, reports, HR, assets, settings). Each page is a Server Component that fetches org-scoped data; mutations go through Server Actions in `src/lib/actions/*`.
+- `src/lib/services/*` — business logic independent of UI:
+  - `billingEngine.ts` — invoice generation from active leases + meter readings, penalty application, reminder cadence.
+  - `commissionEngine.ts` — per-property/period revenue, commission, expenses, net-to-owner reconciliation.
+  - `payrollEngine.ts` — payroll run generation from active employees.
+  - `messagingService.ts` — SMS template rendering + provider abstraction (see below).
+  - `reportsService.ts` — property/tenant performance and revenue trend aggregation.
+- `src/lib/supabase/*` — browser/server Supabase clients and the session-refresh helper used by `src/proxy.ts`.
+- `supabase/functions/daily-cycle` — scheduled Edge Function (see Automation below).
+- Multi-tenancy: every business table is scoped by `org_id` with Postgres RLS policies (`is_org_member` / `has_org_role` helper functions). A user can belong to multiple organizations; the active one is tracked via the `keja_active_org` cookie and switched from the top bar.
 
-To learn more about Next.js, take a look at the following resources:
+## Accounting / general ledger
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Every organization gets a real double-entry ledger (chart of accounts, journal entries, journal lines — see migration `20260921000000_general_ledger.sql`), posted automatically by Postgres triggers off the tables that already exist, not by app code, so it can't be bypassed by any code path (webhooks, the daily-cycle edge function, manual actions):
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Model**: this is trust accounting for a property *management* company. Rent collected isn't the org's own income — it's held for the property owner, so a payment credits **Due to Property Owners** (2200), not an income account. A property-linked expense debits that same liability (paid out of the owner's money). The org's own revenue is **Commission Income** (4900), recognized only at the moment a reconciliation is marked reconciled on the Reconciliation page — never automatically. Non-property expenses (payroll, stationery, general/office) are the org's own and hit its own expense accounts.
+- **Wired automatically**: `payments` (insert) → collection; `expenses` (insert/update/delete, with automatic reversal on edit or delete so the ledger never goes stale) → property draw-down or org expense by category; `payroll_runs` (status → processed) → payroll expense; `commission_ledger` (status → reconciled) → commission recognition; `leases` (insert, and update of `deposit_amount`) → security deposit collected into **Security Deposits Held** (2100); `lease_terminations` (update of `refunded` → true) → deposit settled, splitting it between a cash refund to the tenant and recovery into Due to Property Owners for whatever was deducted (arrears, water/electricity, damage).
+- **Manual entry points** (both post through the same `post_journal_entry()` Postgres function every trigger uses — clients never insert into `journal_entries`/`journal_lines` directly, RLS only grants them `select`): recording an actual payout to an owner (property breakdown on the Accounting Overview page), and marking a lease termination's deposit as refunded/settled (the termination report page — a deliberate confirmation step, same pattern as "mark reconciled").
+- **Pages**: `/accounting` (Overview) — cash, deposits-held, and owner-liability balances, income/expense/commission breakdown by property for a chosen period, a deposits-added/deducted breakdown, plus the org's own P&L. `/accounting/ledger` — the chart of accounts with running balances and the full journal, most recent first.
+- **Deposit held/refunded is also visible on the Leases and Tenant pages** — each lease shows its deposit amount, and once terminated, whether the deposit has been settled yet.
+- **Known gap**: equipment purchases aren't posted to the ledger yet (equipment is just an asset registry today, with no expense/cash flow tied to adding one).
 
-## Deploy on Vercel
+## Automation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+A daily job (`supabase/functions/daily-cycle`, scheduled via `pg_cron` — see the `keja-daily-cycle` job) does, for every organization:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. On the last day of the month only: generates next month's rent invoices for active leases (idempotent — skips leases already billed for the period) and immediately sends each tenant an "invoice issued" message, so they have notice before the new period's due date.
+2. On the last day of the month only: computes a "pending" `commission_ledger` reconciliation (gross revenue, commission, expenses, net-to-owner) for every property, for the month that just ended. This never touches a property/period a user already marked **reconciled** on the Reconciliation page — that confirmation is a deliberate human step and is never overwritten by automation, on this schedule or a manual re-run.
+3. Every day: marks invoices overdue past their due date.
+4. Every day: applies the configured penalty rule once a set grace period has passed.
+5. Every day: sends "rent due" / "partial payment" SMS reminders on a repeating cadence, both configurable per org under **Settings → Organization**.
+
+The penalty/reminder half of this (`runBillingAutomation` in `lib/services/billingEngine.ts`) is also exposed as a manual **"Run billing automation now"** button on the Invoices page. Invoice generation itself has its own manual form on that same page (pick any period, not just next month) — it also sends the "invoice issued" message per invoice created.
+
+## Stubbed integrations — swap these in for production
+
+No live SMS or payment credentials are wired in. Everything routes through provider interfaces so swapping in real ones is a small, contained change:
+
+- **SMS/WhatsApp** — orgs configure their own provider under **Settings → SMS/WhatsApp Gateway** (`src/lib/services/messagingService.ts`); each provider class (e.g. `AfricasTalkingProvider`) has a commented-out `fetch` call ready to complete. Until wired, messages are logged to `messages_log` and printed to the server console instead of sent. Note: the `daily-cycle` Edge Function has its own copy of the SMS-sending stub (Deno can't import the Next.js app's code) and still only checks the `AFRICASTALKING_API_KEY` env var/secret rather than the per-org DB-configured gateway — bring it to parity with `messagingService.ts` if you need automated messages (invoice-issued, reminders, penalties) to use an org's configured gateway rather than the console stub.
+- **Payments (M-Pesa / bank)** — invoices can still be settled manually via the Payments page, but two Route Handlers now accept automatic payment notifications and apply them the same way `recordPayment` does (record payment → auto-generate receipt via DB trigger → send it): `src/app/api/webhooks/mpesa/[orgId]/route.ts` implements Safaricom Daraja's real C2B Confirmation payload shape (register `https://<domain>/api/webhooks/mpesa/{orgId}` as your Confirmation URL once you have live Daraja credentials — the URL is shown per-org under **Settings → Payment Gateways**), and `src/app/api/webhooks/bank/[orgId]/route.ts` is a generic stub to adapt to whichever bank API you integrate (there's no universal standard). Both match the incoming payment to a tenant by phone number and apply it to their oldest open invoice — swap in a stabler match key (e.g. an account reference) if phone-matching isn't reliable enough for your tenants. Requires `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` since webhooks have no logged-in user session to authenticate as.
+- **Email** — `src/lib/services/emailService.ts`, following the same interface pattern as SMS/WhatsApp. Set `RESEND_API_KEY` / `RESEND_FROM_EMAIL` in `.env.local` to activate Resend and complete the commented-out `fetch` call in `ResendEmailProvider.send()`; until then, emails are logged to the server console. `sendDocumentByEmail()` renders a `PdfDocument` (the same shape used for print/download) to PDF bytes server-side and emails it as an attachment — used by Quotes and Credit Notes (`DocumentActions`' "Send via Email" / "Send via WhatsApp" buttons, shown only when the recipient has an email/phone on file). Any other document type (invoices, receipts) can get the same buttons by passing `onSendEmail/onSendWhatsApp` to its `DocumentActions`.
+
+## Notes
+
+- Payroll deductions are modeled as a generic line item; exact statutory tables (PAYE/NSSF/NHIF, etc.) aren't hardcoded — extend `lib/services/payrollEngine.ts` when you have the specific rules you need.
+- Deployment isn't configured yet — this has only been run locally / previewed. Any Node host that supports Next.js 16 works (Vercel is the default target for `next build`).
