@@ -10,7 +10,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar orgType={active.organization.org_type} />
       <div className="flex flex-1 flex-col overflow-hidden print:block print:overflow-visible">
         <Topbar memberships={memberships} active={active} userEmail={user.email ?? ''} />
-        <main className="flex-1 overflow-y-auto p-6 print:overflow-visible print:p-0">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 print:overflow-visible print:p-0">{children}</main>
       </div>
     </div>
   )
