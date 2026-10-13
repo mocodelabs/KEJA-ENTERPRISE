@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { ACTIVE_ORG_COOKIE, requireActiveOrg } from '@/lib/session'
 import { isPropertyManager } from '@/lib/orgAccess'
-import { isValidNationalId, isValidKraPin, normalizeKraPin } from '@/lib/kenyaId'
+import { parseTaxIdentity } from '@/lib/kenyaId'
 import type { AuthActionState } from '@/lib/actions/auth'
 
 export async function createOrganization(
@@ -15,19 +15,17 @@ export async function createOrganization(
 ): Promise<AuthActionState> {
   const name = String(formData.get('name') ?? '')
   const orgType = String(formData.get('org_type') ?? 'manager') as 'manager' | 'owner_direct'
-  const nationalId = String(formData.get('owner_national_id') ?? '').trim()
-  const kraPin = normalizeKraPin(String(formData.get('owner_kra_pin') ?? ''))
 
   if (!name.trim()) return { error: 'Organization name is required.' }
-  if (!isValidNationalId(nationalId)) return { error: 'Enter a valid National ID (6-10 digits).' }
-  if (!isValidKraPin(kraPin)) return { error: 'Enter a valid KRA PIN (e.g. A012345678Z).' }
+  const tax = parseTaxIdentity(formData)
+  if (tax.error !== undefined) return { error: tax.error }
 
   const supabase = await createClient()
   const { data: orgId, error } = await supabase.rpc('create_organization', {
     org_name: name,
     org_kind: orgType,
-    p_owner_national_id: nationalId,
-    p_owner_kra_pin: kraPin,
+    p_owner_national_id: tax.nationalId ?? undefined,
+    p_owner_kra_pin: tax.kraPin ?? undefined,
   })
 
   if (error) return { error: error.message }
@@ -83,15 +81,12 @@ export async function updateOwnerTaxIdentity(
 ): Promise<AuthActionState> {
   const { supabase, active } = await requireActiveOrg()
 
-  const nationalId = String(formData.get('owner_national_id') ?? '').trim()
-  const kraPin = normalizeKraPin(String(formData.get('owner_kra_pin') ?? ''))
-
-  if (!isValidNationalId(nationalId)) return { error: 'Enter a valid National ID (6-10 digits).' }
-  if (!isValidKraPin(kraPin)) return { error: 'Enter a valid KRA PIN (e.g. A012345678Z).' }
+  const tax = parseTaxIdentity(formData)
+  if (tax.error !== undefined) return { error: tax.error }
 
   const { error } = await supabase
     .from('organizations')
-    .update({ owner_national_id: nationalId, owner_kra_pin: kraPin })
+    .update({ owner_national_id: tax.nationalId, owner_kra_pin: tax.kraPin })
     .eq('id', active.org_id)
 
   if (error) return { error: error.message }

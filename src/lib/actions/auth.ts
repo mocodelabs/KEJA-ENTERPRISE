@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ACTIVE_ORG_COOKIE } from '@/lib/session'
-import { isValidNationalId, isValidKraPin, normalizeKraPin } from '@/lib/kenyaId'
+import { parseTaxIdentity } from '@/lib/kenyaId'
 
 export type AuthActionState = { error?: string; message?: string } | null
 
@@ -14,12 +14,11 @@ export async function signUp(_prevState: AuthActionState, formData: FormData): P
   const fullName = String(formData.get('full_name') ?? '')
   const orgName = String(formData.get('org_name') ?? '').trim()
   const orgType = String(formData.get('org_type') ?? 'manager') as 'manager' | 'owner_direct'
-  const nationalId = String(formData.get('owner_national_id') ?? '').trim()
-  const kraPin = normalizeKraPin(String(formData.get('owner_kra_pin') ?? ''))
 
   if (!orgName) return { error: 'Company / property name is required.' }
-  if (!isValidNationalId(nationalId)) return { error: 'Enter a valid National ID (6-10 digits).' }
-  if (!isValidKraPin(kraPin)) return { error: 'Enter a valid KRA PIN (e.g. A012345678Z).' }
+  const tax = parseTaxIdentity(formData)
+  if (tax.error !== undefined) return { error: tax.error }
+  const { nationalId, kraPin } = tax
 
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signUp({
@@ -49,8 +48,8 @@ export async function signUp(_prevState: AuthActionState, formData: FormData): P
   const { data: orgId, error: orgError } = await supabase.rpc('create_organization', {
     org_name: orgName,
     org_kind: orgType,
-    p_owner_national_id: nationalId,
-    p_owner_kra_pin: kraPin,
+    p_owner_national_id: nationalId ?? undefined,
+    p_owner_kra_pin: kraPin ?? undefined,
   })
 
   if (orgError) return { error: orgError.message }

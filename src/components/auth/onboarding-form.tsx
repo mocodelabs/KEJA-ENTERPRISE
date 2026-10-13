@@ -34,22 +34,20 @@ export function OnboardingForm({
         </Select>
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="owner_national_id">Owner National ID</Label>
+        <Label htmlFor="owner_national_id">Owner National ID (optional)</Label>
         <Input
           id="owner_national_id"
           name="owner_national_id"
-          required
           inputMode="numeric"
           defaultValue={defaultNationalId}
           placeholder="e.g. 12345678"
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="owner_kra_pin">Owner KRA PIN</Label>
+        <Label htmlFor="owner_kra_pin">Owner KRA PIN (optional)</Label>
         <Input
           id="owner_kra_pin"
           name="owner_kra_pin"
-          required
           defaultValue={defaultKraPin}
           placeholder="e.g. A012345678Z"
           className="uppercase"

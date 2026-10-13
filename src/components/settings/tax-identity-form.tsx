@@ -24,24 +24,22 @@ export function TaxIdentityForm({
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="owner_national_id">Owner National ID</Label>
+        <Label htmlFor="owner_national_id">Owner National ID (optional)</Label>
         <Input
           key={nationalId}
           id="owner_national_id"
           name="owner_national_id"
-          required
           inputMode="numeric"
           defaultValue={nationalId ?? ''}
           placeholder="e.g. 12345678"
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="owner_kra_pin">Owner KRA PIN</Label>
+        <Label htmlFor="owner_kra_pin">Owner KRA PIN (optional)</Label>
         <Input
           key={kraPin}
           id="owner_kra_pin"
           name="owner_kra_pin"
-          required
           defaultValue={kraPin ?? ''}
           placeholder="e.g. A012345678Z"
           className="uppercase"

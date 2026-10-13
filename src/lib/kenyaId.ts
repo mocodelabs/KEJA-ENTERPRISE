@@ -11,3 +11,19 @@ export function normalizeKraPin(value: string) {
 export function isValidKraPin(value: string) {
   return /^[A-Z]\d{9}[A-Z]$/.test(normalizeKraPin(value))
 }
+
+/**
+ * Both the National ID and KRA PIN are optional while the platform is in trial,
+ * but a value that is provided must still be well-formed. Blank values come back as null.
+ */
+export function parseTaxIdentity(formData: FormData):
+  | { error: string }
+  | { error?: undefined; nationalId: string | null; kraPin: string | null } {
+  const nationalId = String(formData.get('owner_national_id') ?? '').trim()
+  const kraPin = normalizeKraPin(String(formData.get('owner_kra_pin') ?? ''))
+
+  if (nationalId && !isValidNationalId(nationalId)) return { error: 'Enter a valid National ID (6-10 digits).' }
+  if (kraPin && !isValidKraPin(kraPin)) return { error: 'Enter a valid KRA PIN (e.g. A012345678Z).' }
+
+  return { nationalId: nationalId || null, kraPin: kraPin || null }
+}

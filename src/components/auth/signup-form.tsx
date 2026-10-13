@@ -37,20 +37,21 @@ export function SignupForm() {
         </Select>
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="owner_national_id">Owner National ID</Label>
-        <Input id="owner_national_id" name="owner_national_id" required inputMode="numeric" placeholder="e.g. 12345678" />
+        <Label htmlFor="owner_national_id">Owner National ID (optional)</Label>
+        <Input id="owner_national_id" name="owner_national_id" inputMode="numeric" placeholder="e.g. 12345678" />
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="owner_kra_pin">Owner KRA PIN</Label>
+        <Label htmlFor="owner_kra_pin">Owner KRA PIN (optional)</Label>
         <Input
           id="owner_kra_pin"
           name="owner_kra_pin"
-          required
           placeholder="e.g. A012345678Z"
           className="uppercase"
           maxLength={11}
         />
-        <p className="text-xs text-slate-400">Used to verify your account and for tax reporting we&apos;re adding soon.</p>
+        <p className="text-xs text-slate-400">
+          You can skip these for now and add them later in Settings. They&apos;ll be used for tax reporting we&apos;re adding soon.
+        </p>
       </div>
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       {state?.message && <p className="text-sm text-emerald-700">{state.message}</p>}
