@@ -9,7 +9,8 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (user && isDemoUser(user.email)) await supabase.auth.signOut()
+  // `local`: the demo user is shared, so don't end other visitors' demo sessions.
+  if (user && isDemoUser(user.email)) await supabase.auth.signOut({ scope: 'local' })
 
   return NextResponse.redirect(new URL('/signup', request.url))
 }

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ACTIVE_ORG_COOKIE } from '@/lib/session'
+import { isDemoUser } from '@/lib/demo'
 import { parseTaxIdentity } from '@/lib/kenyaId'
 
 export type AuthActionState = { error?: string; message?: string } | null
@@ -78,6 +79,10 @@ export async function signIn(_prevState: AuthActionState, formData: FormData): P
 
 export async function signOut() {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  // The demo user is shared by every demo visitor, so only end this browser's session.
+  await supabase.auth.signOut({ scope: isDemoUser(user?.email) ? 'local' : 'global' })
   redirect('/login')
 }
