@@ -29,7 +29,8 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/signup')
-  const isPublicRoute = path === '/' || isAuthRoute
+  // /brochure is the public MoCode Labs sales page + PDF (static files in public/brochure).
+  const isPublicRoute = path === '/' || isAuthRoute || path === '/brochure' || path.startsWith('/brochure/')
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
@@ -37,7 +38,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && isAuthRoute) {
+  // The public landing page (next.config.ts rewrites "/" to the static brochure) is for
+  // visitors; people who are already signed in go straight to their dashboard.
+  if (user && (isAuthRoute || path === '/')) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
