@@ -4,18 +4,21 @@ import { revalidatePath } from 'next/cache'
 import { requireActiveOrg } from '@/lib/session'
 import { createPayrollRunForActiveEmployees } from '@/lib/services/payrollEngine'
 import { validateDocumentUpload, sanitizeFilename } from '@/lib/fileUploads'
+import { isDemoUser } from '@/lib/demo'
 import type { AuthActionState } from '@/lib/actions/auth'
 
 export async function createEmployee(
   _prev: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
-  const { supabase, active } = await requireActiveOrg()
+  const { supabase, user, active } = await requireActiveOrg()
   const fullName = String(formData.get('full_name') ?? '').trim()
   const salary = Number(formData.get('salary') ?? 0)
   if (!fullName || salary <= 0) return { error: 'Name and a valid salary are required.' }
 
-  const contractUpload = validateDocumentUpload(formData.get('contract'))
+  const contractUpload = validateDocumentUpload(formData.get('contract'), {
+    uploadsDisabled: isDemoUser(user.email),
+  })
   if (contractUpload.error) return { error: contractUpload.error }
   const contractFile = contractUpload.file
 
@@ -57,7 +60,7 @@ export async function updateEmployee(
   _prev: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
-  const { supabase, active } = await requireActiveOrg()
+  const { supabase, user, active } = await requireActiveOrg()
 
   const id = String(formData.get('id') ?? '')
   if (!id) return { error: 'Missing employee.' }
@@ -66,7 +69,9 @@ export async function updateEmployee(
   const salary = Number(formData.get('salary') ?? 0)
   if (!fullName || salary <= 0) return { error: 'Name and a valid salary are required.' }
 
-  const contractUpload = validateDocumentUpload(formData.get('contract'))
+  const contractUpload = validateDocumentUpload(formData.get('contract'), {
+    uploadsDisabled: isDemoUser(user.email),
+  })
   if (contractUpload.error) return { error: contractUpload.error }
   const contractFile = contractUpload.file
 

@@ -3,13 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { requireActiveOrg } from '@/lib/session'
 import { validateDocumentUpload, sanitizeFilename } from '@/lib/fileUploads'
+import { isDemoUser } from '@/lib/demo'
 import type { AuthActionState } from '@/lib/actions/auth'
 
 export async function createTenant(
   _prev: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
-  const { supabase, active } = await requireActiveOrg()
+  const { supabase, user, active } = await requireActiveOrg()
 
   const fullName = String(formData.get('full_name') ?? '').trim()
   const phone = String(formData.get('phone') ?? '').trim()
@@ -22,7 +23,9 @@ export async function createTenant(
     return { error: 'Every tenant must be pegged to a lease — select a unit, start date, and rent.' }
   }
 
-  const contractUpload = validateDocumentUpload(formData.get('contract'))
+  const contractUpload = validateDocumentUpload(formData.get('contract'), {
+    uploadsDisabled: isDemoUser(user.email),
+  })
   if (contractUpload.error) return { error: contractUpload.error }
   const contractFile = contractUpload.file
 

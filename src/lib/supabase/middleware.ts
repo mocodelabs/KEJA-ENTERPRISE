@@ -30,7 +30,13 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/signup')
   // /brochure is the public MoCode Labs sales page + PDF (static files in public/brochure).
-  const isPublicRoute = path === '/' || isAuthRoute || path === '/brochure' || path.startsWith('/brochure/')
+  const isPublicRoute =
+    path === '/' ||
+    isAuthRoute ||
+    path === '/brochure' ||
+    path.startsWith('/brochure/') ||
+    path === '/demo' ||
+    path.startsWith('/demo/')
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()

@@ -11,10 +11,19 @@ export function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(-100)
 }
 
-/** Validates an uploaded File (or missing/empty file input) against the shared document rules. */
-export function validateDocumentUpload(file: FormDataEntryValue | null): { error?: string; file: File | null } {
+/**
+ * Validates an uploaded File (or missing/empty file input) against the shared document rules.
+ * Pass `uploadsDisabled` for the public demo account, which may not store files (also enforced in
+ * the database by the demo_user_no_uploads storage policy).
+ */
+export function validateDocumentUpload(
+  file: FormDataEntryValue | null,
+  { uploadsDisabled = false }: { uploadsDisabled?: boolean } = {}
+): { error?: string; file: File | null } {
   const hasFile = file instanceof File && file.size > 0
   if (!hasFile) return { file: null }
+
+  if (uploadsDisabled) return { error: 'File uploads are turned off in the demo. Create an account to try them.', file: null }
 
   if (file.size > MAX_DOCUMENT_SIZE) return { error: 'File must be under 10MB.', file: null }
   if (!ALLOWED_DOCUMENT_TYPES.includes(file.type)) {

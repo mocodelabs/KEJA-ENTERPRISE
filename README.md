@@ -29,6 +29,14 @@ Sign up, create an organization on the onboarding screen (choose "property manag
 
 The public landing page at `/` is the static sales page in `public/brochure/index.html` (served via a `beforeFiles` rewrite in `next.config.ts`; it also lives at `/brochure`), with Log in / Sign up / Book a demo buttons. Signed-in users who open `/` are redirected to `/dashboard` by `src/lib/supabase/middleware.ts`, and `/brochure/*` is exempt from the login redirect. The downloadable PDF (`public/brochure/KEJA-Enterprise-Brochure.pdf`) is rendered from the same HTML via its print stylesheet — after editing the HTML, regenerate it with headless Edge/Chrome: `msedge --headless --no-pdf-header-footer --print-to-pdf=KEJA-Enterprise-Brochure.pdf file:///<path>/public/brochure/index.html`.
 
+## Live demo account
+
+"Try the live demo" (`/demo`) signs a visitor in as a shared demo user in a fully populated sample organisation (3 properties, 17 units, 14 tenants, three months of invoices/payments/receipts, expenses, maintenance, commission reconciliation, payroll staff, equipment and stationery). Everything is created by Postgres, not app code:
+
+- `seed_demo_data()` / `reset_demo_data()` (migrations `20260930010000_demo_account` and `20260930020000_demo_reset_stable_user`) wipe the demo user's organisations — including any a visitor creates — repair the demo account (email, password, metadata) and re-seed with dates relative to today.
+- `pg_cron` job `keja-demo-reset` runs it **every hour**; run `select public.reset_demo_data();` for an on-demand reset. Neither function is executable by `anon`/`authenticated`.
+- The demo credentials (`src/lib/demo.ts`) are intentionally public. Keep them in sync with the migration. The demo user can't upload files (storage policy `demo_user_no_uploads` + a friendly app-level message), and a banner in the dashboard offers "Create your own account" (`/demo/exit`).
+
 ## Architecture
 
 - `src/app/(dashboard)/**` — one route per module (properties, tenants, leases, billing, payments, messaging, quotes/credit notes, accounting, reports, HR, assets, settings). Each page is a Server Component that fetches org-scoped data; mutations go through Server Actions in `src/lib/actions/*`.
